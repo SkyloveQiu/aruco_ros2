@@ -44,7 +44,7 @@ from rcl_interfaces.msg import ParameterDescriptor, ParameterType
 class ArucoNode(rclpy.node.Node):
     def __init__(self):
         super().__init__("aruco_node")
-
+        print("initialized")
         # Declare and read parameters
         self.declare_parameter(
             name="marker_size",
@@ -66,7 +66,7 @@ class ArucoNode(rclpy.node.Node):
 
         self.declare_parameter(
             name="image_topic",
-            value="/camera/image_raw",
+            value="/image_raw",
             descriptor=ParameterDescriptor(
                 type=ParameterType.PARAMETER_STRING,
                 description="Image topic to subscribe to.",
@@ -75,7 +75,7 @@ class ArucoNode(rclpy.node.Node):
 
         self.declare_parameter(
             name="camera_info_topic",
-            value="/camera/camera_info",
+            value="/camera_info",
             descriptor=ParameterDescriptor(
                 type=ParameterType.PARAMETER_STRING,
                 description="Camera info topic to subscribe to.",
@@ -135,6 +135,7 @@ class ArucoNode(rclpy.node.Node):
         self.create_subscription(
             Image, image_topic, self.image_callback, qos_profile_sensor_data
         )
+        self.get_logger().info("image initialized")
 
         # Set up publishers
         self.poses_pub = self.create_publisher(PoseArray, "aruco_poses", 10)
@@ -144,12 +145,12 @@ class ArucoNode(rclpy.node.Node):
         self.info_msg = None
         self.intrinsic_mat = None
         self.distortion = None
-
-        self.aruco_dictionary = cv2.aruco.Dictionary_get(dictionary_id)
-        self.aruco_parameters = cv2.aruco.DetectorParameters_create()
+        dictionary = cv2.aruco.getPredefinedDictionary(dictionary_id)
+        parameters = cv2.aruco.DetectorParameters()
+        self.detector = cv2.aruco.ArucoDetector(dictionary, parameters)
         self.bridge = CvBridge()
 
-    def info_callback(self, info_msg):
+    def info_callback(self, info_msg):        
         self.info_msg = info_msg
         self.intrinsic_mat = np.reshape(np.array(self.info_msg.k), (3, 3))
         self.distortion = np.array(self.info_msg.d)
@@ -157,6 +158,8 @@ class ArucoNode(rclpy.node.Node):
         self.destroy_subscription(self.info_sub)
 
     def image_callback(self, img_msg):
+
+        print("Image callback")
         if self.info_msg is None:
             self.get_logger().warn("No camera info has been received!")
             return
@@ -174,9 +177,8 @@ class ArucoNode(rclpy.node.Node):
         markers.header.stamp = img_msg.header.stamp
         pose_array.header.stamp = img_msg.header.stamp
 
-        corners, marker_ids, rejected = cv2.aruco.detectMarkers(
-            cv_image, self.aruco_dictionary, parameters=self.aruco_parameters
-        )
+        corners, marker_ids, rejected = self.detector.detectMarkers(cv_image)
+        self.get_logger().info(marker_ids)
         if marker_ids is not None:
             if cv2.__version__ > "4.0.0":
                 rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(

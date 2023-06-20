@@ -30,11 +30,13 @@ def main():
                         choices=dict_options,
                         help=dict_help, metavar='')
     args = parser.parse_args()
-
     dictionary_id = cv2.aruco.__getattribute__(args.dictionary)
-    dictionary = cv2.aruco.Dictionary_get(dictionary_id)
+    dictionary = cv2.aruco.getPredefinedDictionary(dictionary_id)
+    parameters = cv2.aruco.DetectorParameters()
+    detector = cv2.aruco.ArucoDetector(dictionary, parameters)
+
     image = np.zeros((args.size, args.size), dtype=np.uint8)
-    image = cv2.aruco.drawMarker(dictionary, args.id, args.size, image, 1)
+    image = cv2.aruco.generateImageMarker(dictionary, args.id, args.size, image, 1)
     cv2.imwrite("marker_{:04d}.png".format(args.id), image)
 
 
